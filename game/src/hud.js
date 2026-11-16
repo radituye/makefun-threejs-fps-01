@@ -1,160 +1,160 @@
-// HUD: every DOM readout in one place. main.js calls the setters; this
-// module owns the elements and the formatting, and nothing else. The buy
-// menu, the plant bar and the scope overlay are plain DOM, so they cost
+// Readout: every DOM readout in one place. main.js calls the setters; this
+// module owns the elements and the formatting, and nothing else. The shop
+// menu, the rig bar and the scope overlay are plain DOM, so they cost
 // the renderer nothing.
-export function createHud() {
+export function buildReadout() {
   const $ = (id) => document.getElementById(id);
   const els = {
-    overlay: $('overlay'),
-    overlayTitle: $('overlay-title'),
-    overlayCopy: $('overlay-copy'),
-    play: $('play'),
-    crosshair: $('crosshair'),
-    hitmarker: $('hitmarker'),
-    healthNum: $('health-num'),
-    healthBar: $('health-bar'),
-    armorNum: $('armor-num'),
-    ammoMag: $('ammo-mag'),
-    ammoReserve: $('ammo-reserve'),
-    weaponName: $('weapon-name'),
-    money: $('money'),
-    timer: $('timer'),
-    score: $('score'),
-    pips: $('pips'),
-    killfeed: $('killfeed'),
-    banner: $('banner'),
-    bannerTitle: $('banner-title'),
-    bannerSub: $('banner-sub'),
-    buymenu: $('buymenu'),
-    buyMoney: $('buy-money'),
-    plantbar: $('plantbar'),
-    plantFill: $('plant-fill'),
-    plantLabel: $('plant-label'),
-    spike: $('spike'),
-    spikeTimer: $('spike-timer'),
-    vignette: $('vignette'),
-    scope: $('scope'),
+    veil: $('overlay'),
+    veilTitle: $('overlay-title'),
+    veilCopy: $('overlay-copy'),
+    go: $('play'),
+    sight: $('crosshair'),
+    marker: $('hitmarker'),
+    vigorNum: $('health-num'),
+    vigorBar: $('health-bar'),
+    plateNum: $('armor-num'),
+    clipNum: $('ammo-mag'),
+    spareNum: $('ammo-reserve'),
+    gunLabel: $('weapon-name'),
+    funds: $('money'),
+    clock: $('timer'),
+    tally: $('score'),
+    dots: $('pips'),
+    feed: $('killfeed'),
+    flag: $('banner'),
+    flagTitle: $('banner-title'),
+    flagSub: $('banner-sub'),
+    shop: $('buymenu'),
+    shopFunds: $('buy-money'),
+    channel: $('plantbar'),
+    channelFill: $('plant-fill'),
+    channelLabel: $('plant-label'),
+    fuse: $('spike'),
+    fuseClock: $('spike-timer'),
+    hurtVeil: $('vignette'),
+    lens: $('scope'),
   };
-  let hitTimer = null;
-  let bannerTimer = null;
+  let markTimer = null;
+  let flagTimer = null;
 
-  function setVisible(el, on) {
+  function flip(el, on) {
     if (el) el.hidden = !on;
   }
 
   return {
-    setHealth(health, armor) {
-      els.healthNum.textContent = String(Math.ceil(health));
-      els.healthBar.style.width = `${Math.max(0, health)}%`;
-      els.healthBar.classList.toggle('low', health <= 30);
-      els.armorNum.textContent = armor > 0 ? `+${Math.ceil(armor)}` : '';
+    showVigor(vigor, plating) {
+      els.vigorNum.textContent = String(Math.ceil(vigor));
+      els.vigorBar.style.width = `${Math.max(0, vigor)}%`;
+      els.vigorBar.classList.toggle('low', vigor <= 30);
+      els.plateNum.textContent = plating > 0 ? `+${Math.ceil(plating)}` : '';
     },
-    setAmmo(mag, reserve, name) {
-      els.ammoMag.textContent = String(mag);
-      els.ammoReserve.textContent = `/ ${reserve}`;
-      els.weaponName.textContent = name;
-      els.ammoMag.parentElement.classList.toggle('empty', mag === 0);
+    showAmmo(clip, spare, label) {
+      els.clipNum.textContent = String(clip);
+      els.spareNum.textContent = `/ ${spare}`;
+      els.gunLabel.textContent = label;
+      els.clipNum.parentElement.classList.toggle('empty', clip === 0);
     },
-    setMoney(money) {
-      els.money.textContent = `$${money}`;
-      els.buyMoney.textContent = `$${money}`;
+    showFunds(funds) {
+      els.funds.textContent = `$${funds}`;
+      els.shopFunds.textContent = `$${funds}`;
     },
-    setTimer(seconds, phase) {
+    showClock(seconds, stage) {
       const s = Math.max(0, Math.ceil(seconds));
-      els.timer.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      els.timer.classList.toggle('buy', phase === 'buy');
+      els.clock.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      els.clock.classList.toggle('buy', stage === 'shop');
     },
-    setScore(wins, losses, round) {
-      els.score.textContent = `R${round}  ${wins} — ${losses}`;
-      let pips = '';
-      for (let i = 0; i < 5; i += 1) pips += `<i class="${i < wins ? 'won' : ''}"></i>`;
-      pips += '<span>·</span>';
-      for (let i = 0; i < 5; i += 1) pips += `<i class="foe ${i < losses ? 'won' : ''}"></i>`;
-      els.pips.innerHTML = pips;
+    showTally(taken, ceded, roundNo) {
+      els.tally.textContent = `R${roundNo}  ${taken} — ${ceded}`;
+      let dots = '';
+      for (let i = 0; i < 5; i += 1) dots += `<i class="${i < taken ? 'won' : ''}"></i>`;
+      dots += '<span>·</span>';
+      for (let i = 0; i < 5; i += 1) dots += `<i class="foe ${i < ceded ? 'won' : ''}"></i>`;
+      els.dots.innerHTML = dots;
     },
-    setCrosshairSpread(px) {
-      els.crosshair.style.setProperty('--gap', `${px}px`);
+    spreadSight(px) {
+      els.sight.style.setProperty('--gap', `${px}px`);
     },
-    hitMarker(head, holdMs) {
-      els.hitmarker.classList.add('on');
-      els.hitmarker.classList.toggle('head', head);
-      clearTimeout(hitTimer);
-      hitTimer = setTimeout(() => els.hitmarker.classList.remove('on', 'head'), holdMs);
+    markHit(head, holdMs) {
+      els.marker.classList.add('on');
+      els.marker.classList.toggle('head', head);
+      clearTimeout(markTimer);
+      markTimer = setTimeout(() => els.marker.classList.remove('on', 'head'), holdMs);
     },
-    damageFlash() {
-      els.vignette.classList.remove('flash');
+    flashHurt() {
+      els.hurtVeil.classList.remove('flash');
       // Re-trigger the CSS animation by forcing a reflow.
-      void els.vignette.offsetWidth;
-      els.vignette.classList.add('flash');
+      void els.hurtVeil.offsetWidth;
+      els.hurtVeil.classList.add('flash');
     },
-    killfeed(text) {
+    feedLine(text) {
       const line = document.createElement('div');
       line.textContent = text;
-      els.killfeed.prepend(line);
-      while (els.killfeed.children.length > 5) els.killfeed.lastChild.remove();
+      els.feed.prepend(line);
+      while (els.feed.children.length > 5) els.feed.lastChild.remove();
       setTimeout(() => line.remove(), 6000);
     },
-    banner(title, sub, holdMs = 2600) {
-      els.bannerTitle.textContent = title;
-      els.bannerSub.textContent = sub;
-      setVisible(els.banner, true);
-      clearTimeout(bannerTimer);
-      bannerTimer = setTimeout(() => setVisible(els.banner, false), holdMs);
+    showFlag(title, sub, holdMs = 2600) {
+      els.flagTitle.textContent = title;
+      els.flagSub.textContent = sub;
+      flip(els.flag, true);
+      clearTimeout(flagTimer);
+      flagTimer = setTimeout(() => flip(els.flag, false), holdMs);
     },
-    hideBanner() {
-      setVisible(els.banner, false);
+    clearFlag() {
+      flip(els.flag, false);
     },
-    showBuy(on) {
-      setVisible(els.buymenu, on);
+    showShop(on) {
+      flip(els.shop, on);
     },
-    setBuyAfford(money, prices) {
+    greyPoor(funds) {
       // Grey out what the player cannot afford; called on every buy.
-      const items = els.buymenu.querySelectorAll('[data-price]');
+      const items = els.shop.querySelectorAll('[data-price]');
       for (const item of items) {
-        item.classList.toggle('poor', Number(item.dataset.price) > money);
+        item.classList.toggle('poor', Number(item.dataset.price) > funds);
       }
     },
-    showPlant(label, progress) {
-      setVisible(els.plantbar, true);
-      els.plantLabel.textContent = label;
-      els.plantFill.style.width = `${Math.round(progress * 100)}%`;
+    showChannel(label, progress) {
+      flip(els.channel, true);
+      els.channelLabel.textContent = label;
+      els.channelFill.style.width = `${Math.round(progress * 100)}%`;
     },
-    hidePlant() {
-      setVisible(els.plantbar, false);
+    hideChannel() {
+      flip(els.channel, false);
     },
-    setSpike(seconds) {
+    showFuse(seconds) {
       if (seconds === null) {
-        setVisible(els.spike, false);
+        flip(els.fuse, false);
         return;
       }
-      setVisible(els.spike, true);
-      els.spikeTimer.textContent = seconds.toFixed(1);
+      flip(els.fuse, true);
+      els.fuseClock.textContent = seconds.toFixed(1);
     },
-    setScope(on) {
-      setVisible(els.scope, on);
-      setVisible(els.crosshair, !on);
+    showLens(on) {
+      flip(els.lens, on);
+      flip(els.sight, !on);
     },
-    showOverlay(kind, score) {
-      const copy = {
-        start: ['TIDELOCK', 'A night freight terminal. Plant the spike at Crane Bay or the Warehouse — or clear the yard. Click to play.'],
+    openPanel(kind, tally) {
+      const words = {
+        start: ['TIDELOCK', 'A night freight terminal. Plant the charge at Crane Bay or the Warehouse — or clear the yard. Click to play.'],
         paused: ['Paused', 'Click to keep playing.'],
         dead: ['You are down', 'Your team holds the yard without you. The round plays on.'],
-        round: ['Round over', score ?? ''],
-        match: ['Match over', score ?? ''],
+        round: ['Round over', tally ?? ''],
+        match: ['Match over', tally ?? ''],
       }[kind] || ['TIDELOCK', ''];
-      els.overlayTitle.textContent = copy[0];
-      els.overlayCopy.textContent = copy[1];
-      els.play.textContent = kind === 'start' ? 'Click to play' : 'Continue';
-      setVisible(els.overlay, true);
+      els.veilTitle.textContent = words[0];
+      els.veilCopy.textContent = words[1];
+      els.go.textContent = kind === 'start' ? 'Click to play' : 'Continue';
+      flip(els.veil, true);
     },
-    hideOverlay() {
-      setVisible(els.overlay, false);
+    closePanel() {
+      flip(els.veil, false);
     },
-    onPlay(fn) {
-      els.play.addEventListener('click', fn);
+    onStart(fn) {
+      els.go.addEventListener('click', fn);
     },
-    overlayVisible() {
-      return !els.overlay.hidden;
+    panelOpen() {
+      return !els.veil.hidden;
     },
   };
 }
