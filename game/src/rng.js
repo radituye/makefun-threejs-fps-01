@@ -1,22 +1,23 @@
-// Seeded RNG: mulberry32. The whole game takes its randomness from one
-// instance per session, so a screenshot seed reproduces the same bot
-// patrol picks and the same container paint order.
-export function mulberry32(seed) {
-  let a = seed | 0;
-  return function next() {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+// Chance: one seeded stream feeds the whole match, so a capture seed
+// replays the same guard patrol choices and the same crate paint order.
+// Mulberry32 — tiny, fast, and good enough for a game that never needs
+// cryptographic randomness.
+export function seededStream(grain) {
+  let state = grain | 0;
+  return function draw() {
+    state = (state + 0x6d2b79f5) | 0;
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-// Pick one element of an array with the seeded RNG.
-export function pick(random, array) {
-  return array[Math.floor(random() * array.length)];
+// Draw one member of a list with the seeded stream.
+export function chooseOne(draw, list) {
+  return list[Math.floor(draw() * list.length)];
 }
 
-// A value in [min, max).
-export function range(random, min, max) {
-  return min + random() * (max - min);
+// A value in [low, high).
+export function spanBetween(draw, low, high) {
+  return low + draw() * (high - low);
 }
