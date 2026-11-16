@@ -1,80 +1,80 @@
-// Economy: money between rounds and the buy phase. One place owns the
-// round clock, the phase and both teams' round wins; main.js drives the
-// transitions, bots and the HUD only read this state.
-export const BUY_SECONDS = 12;
-export const ROUND_SECONDS = 100;
-export const WIN_ROUNDS = 5;
-export const MAX_ROUNDS = 9;
+// Ledger: funds between rounds and the shop phase. One place owns the
+// round clock, the stage and both sides' round wins; main.js drives the
+// transitions, the squad and the readout only read this state.
+export const SHOP_SPAN = 12;
+export const ROUND_SPAN = 100;
+export const ROUNDS_TO_WIN = 5;
+export const ROUND_CAP = 9;
 
-export function createEconomy() {
-  const state = {
-    phase: 'buy', // buy | live | over
-    phaseTime: BUY_SECONDS, // seconds left in the current phase
-    round: 1,
-    wins: 0, // attacker (player) rounds won
-    losses: 0, // defender rounds won
-    money: 800,
-    lossStreak: 0,
-    lastResult: null, // 'win' | 'loss' | null, for the banner
-    lastReason: '',
+export function openLedger() {
+  const books = {
+    stage: 'shop', // shop | live | over
+    stageLeft: SHOP_SPAN, // seconds left in the current stage
+    roundNo: 1,
+    taken: 0, // attacker (player) rounds won
+    ceded: 0, // defender rounds won
+    funds: 800,
+    losingRun: 0,
+    lastOutcome: null, // 'win' | 'loss' | null, for the banner
+    lastCause: '',
   };
 
   return {
-    state,
-    startBuy() {
-      state.phase = 'buy';
-      state.phaseTime = BUY_SECONDS;
+    books,
+    openShop() {
+      books.stage = 'shop';
+      books.stageLeft = SHOP_SPAN;
     },
-    startLive() {
-      state.phase = 'live';
-      state.phaseTime = ROUND_SECONDS;
+    openRound() {
+      books.stage = 'live';
+      books.stageLeft = ROUND_SPAN;
     },
-    step(dt) {
-      if (state.phase === 'over') return null;
-      state.phaseTime -= dt;
-      if (state.phase === 'buy' && state.phaseTime <= 0) {
-        this.startLive();
+    tick(dt) {
+      if (books.stage === 'over') return null;
+      books.stageLeft -= dt;
+      if (books.stage === 'shop' && books.stageLeft <= 0) {
+        this.openRound();
         return 'live';
       }
-      if (state.phase === 'live' && state.phaseTime <= 0) {
+      if (books.stage === 'live' && books.stageLeft <= 0) {
         return 'time';
       }
       return null;
     },
-    // End the round. `won` is the attacker's side. Rewards follow the
+    // Settle the round. `won` is the attacker's side. Rewards follow the
     // Counter-Strike shape: a win pays more than a loss, and a losing
     // streak pays more each time, capped at $3,400.
-    endRound(won, reason) {
-      state.phase = 'over';
-      state.lastResult = won ? 'win' : 'loss';
-      state.lastReason = reason;
+    settleRound(won, cause) {
+      books.stage = 'over';
+      books.lastOutcome = won ? 'win' : 'loss';
+      books.lastCause = cause;
       if (won) {
-        state.wins += 1;
-        state.money += 3250;
-        state.lossStreak = 0;
+        books.taken += 1;
+        books.funds += 3250;
+        books.losingRun = 0;
       } else {
-        state.losses += 1;
-        state.lossStreak += 1;
-        state.money += Math.min(3400, 1400 + state.lossStreak * 500);
+        books.ceded += 1;
+        books.losingRun += 1;
+        books.funds += Math.min(3400, 1400 + books.losingRun * 500);
       }
-      state.money = Math.min(16000, state.money);
-      return state.wins >= WIN_ROUNDS || state.losses >= WIN_ROUNDS || state.round >= MAX_ROUNDS;
+      books.funds = Math.min(16000, books.funds);
+      return books.taken >= ROUNDS_TO_WIN || books.ceded >= ROUNDS_TO_WIN || books.roundNo >= ROUND_CAP;
     },
-    nextRound() {
-      state.round += 1;
-      state.lastResult = null;
-      state.lastReason = '';
-      this.startBuy();
+    advanceRound() {
+      books.roundNo += 1;
+      books.lastOutcome = null;
+      books.lastCause = '';
+      this.openShop();
     },
-    matchOver() {
-      return state.wins >= WIN_ROUNDS || state.losses >= WIN_ROUNDS || state.round >= MAX_ROUNDS;
+    matchDone() {
+      return books.taken >= ROUNDS_TO_WIN || books.ceded >= ROUNDS_TO_WIN || books.roundNo >= ROUND_CAP;
     },
-    addKillReward() {
-      state.money = Math.min(16000, state.money + 300);
+    payKill() {
+      books.funds = Math.min(16000, books.funds + 300);
     },
-    spend(amount) {
-      if (state.money < amount) return false;
-      state.money -= amount;
+    pay(amount) {
+      if (books.funds < amount) return false;
+      books.funds -= amount;
       return true;
     },
   };
