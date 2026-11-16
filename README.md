@@ -6,6 +6,14 @@
 
 TIDELOCK — a round-based tactical FPS in three.js at a night freight terminal. One attacker, five defenders, and a spike to plant at Crane Bay or the Warehouse: earn money each round, buy rifles, an SMG, a scoped DMR, grenades and plating, and win rounds by elimination, detonation or defusal.
 
+## Controls
+
+- **W A S D** move · **Mouse** look · **Click** fire · **Right-click** scope (DMR)
+- **R** reload · **G** grenade · **E** hold to plant the charge · **Ctrl** crouch
+- **1–6** buy in the shop phase, switch weapons once the round is live
+
+First to 5 rounds wins the match (9 rounds max). The charge blows 35 seconds after it is set; a guard can disarm it in 5 seconds.
+
 ## Run it
 
 ```sh
