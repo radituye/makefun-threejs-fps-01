@@ -1,179 +1,179 @@
-// Weapons: the four guns plus the frag grenade. Each gun is a plain
-// definition — damage, headshot multiplier, rate, magazine, spread and
-// price — and one shared state machine (fire, reload, switch). Spread
+// Arsenal: the four guns plus the frag grenade. Each gun is a plain
+// definition — hurt, headshot multiplier, rate, magazine, spread and
+// cost — and one shared state machine (fire, reload, switch). Spread
 // grows with movement and with sustained fire, and shrinks when the
 // shooter stops and crouches, so stopping to aim pays. The DMR's scope
 // (right mouse) narrows spread and zooms the camera.
-export const WEAPONS = {
-  pistol: {
-    id: 'pistol', name: 'Gull P9', kind: 'pistol', price: 300,
-    damage: 26, headMult: 2.0, interval: 0.22, mag: 12, reserve: 36,
-    spreadBase: 0.011, spreadMove: 0.030, spreadAir: 0.02, auto: false,
+export const ARSENAL = {
+  gull: {
+    id: 'gull', label: 'Gull P9', family: 'pistol', cost: 300,
+    hurt: 26, headX: 2.0, gap: 0.22, clip: 12, spare: 36,
+    spreadCalm: 0.011, spreadStride: 0.030, spreadLeap: 0.02, fullAuto: false,
   },
-  smg: {
-    id: 'smg', name: 'Kestrel SMG', kind: 'smg', price: 1500,
-    damage: 22, headMult: 2.0, interval: 0.09, mag: 28, reserve: 84,
-    spreadBase: 0.016, spreadMove: 0.036, spreadAir: 0.024, auto: true,
+  kestrel: {
+    id: 'kestrel', label: 'Kestrel SMG', family: 'smg', cost: 1500,
+    hurt: 22, headX: 2.0, gap: 0.09, clip: 28, spare: 84,
+    spreadCalm: 0.016, spreadStride: 0.036, spreadLeap: 0.024, fullAuto: true,
   },
-  rifle: {
-    id: 'rifle', name: 'Tempest AR', kind: 'rifle', price: 2700,
-    damage: 30, headMult: 2.0, interval: 0.11, mag: 25, reserve: 75,
-    spreadBase: 0.008, spreadMove: 0.028, spreadAir: 0.02, auto: true,
+  tempest: {
+    id: 'tempest', label: 'Tempest AR', family: 'rifle', cost: 2700,
+    hurt: 30, headX: 2.0, gap: 0.11, clip: 25, spare: 75,
+    spreadCalm: 0.008, spreadStride: 0.028, spreadLeap: 0.02, fullAuto: true,
   },
-  dmr: {
-    id: 'dmr', name: 'Longbow DMR', kind: 'dmr', price: 4200,
-    damage: 70, headMult: 2.0, interval: 0.85, mag: 5, reserve: 15,
-    spreadBase: 0.003, spreadMove: 0.02, spreadAir: 0.016, auto: false, scoped: true,
+  longbow: {
+    id: 'longbow', label: 'Longbow DMR', family: 'dmr', cost: 4200,
+    hurt: 70, headX: 2.0, gap: 0.85, clip: 5, spare: 15,
+    spreadCalm: 0.003, spreadStride: 0.02, spreadLeap: 0.016, fullAuto: false, hasScope: true,
   },
 };
-export const GRENADE = { price: 300, max: 2, damage: 110, radius: 6.5, fuse: 1.6 };
-export const ARMOR = { price: 650, amount: 50 };
-export const BUY_KEYS = { Digit1: 'pistol', Digit2: 'smg', Digit3: 'rifle', Digit4: 'dmr', Digit5: 'grenade', Digit6: 'armor' };
+export const FRAG = { cost: 300, max: 2, hurt: 110, radius: 6.5, fuse: 1.6 };
+export const PLATING = { cost: 650, amount: 50 };
+export const SHOP_KEYS = { Digit1: 'gull', Digit2: 'kestrel', Digit3: 'tempest', Digit4: 'longbow', Digit5: 'frag', Digit6: 'plating' };
 
-export function createWeapons(audio) {
-  const state = {
-    current: 'pistol',
-    owned: { pistol: true },
-    mag: { pistol: 12 },
-    reserve: { pistol: 36 },
-    grenades: 0,
-    cooldown: 0,
-    reloading: false,
-    reloadAt: 0,
+export function rackGuns(sound) {
+  const rack = {
+    inHand: 'gull',
+    held: { gull: true },
+    clip: { gull: 12 },
+    spare: { gull: 36 },
+    frags: 0,
+    cool: 0,
+    busy: false,
+    reloadLeft: 0,
     heat: 0, // sustained-fire spread growth, decays when not firing
-    shotsFired: 0,
+    roundsFired: 0,
   };
-  const RELOAD_TIME = 1.6;
+  const RELOAD_SPAN = 1.6;
 
-  function def(id) {
-    return WEAPONS[id];
+  function lookup(id) {
+    return ARSENAL[id];
   }
 
   return {
-    state,
-    def,
-    currentDef() {
-      return WEAPONS[state.current];
+    state: rack,
+    lookup,
+    inHandDef() {
+      return ARSENAL[rack.inHand];
     },
-    // Money-checked purchase; returns the price paid or 0.
-    buy(id, money) {
-      if (id === 'grenade') {
-        if (state.grenades >= GRENADE.max || money < GRENADE.price) return 0;
-        state.grenades += 1;
-        return GRENADE.price;
+    // Funds-checked purchase; returns the cost paid or 0.
+    purchase(id, funds) {
+      if (id === 'frag') {
+        if (rack.frags >= FRAG.max || funds < FRAG.cost) return 0;
+        rack.frags += 1;
+        return FRAG.cost;
       }
-      if (id === 'armor') {
-        if (money < ARMOR.price) return 0;
-        return ARMOR.price; // the caller tops the armour up
+      if (id === 'plating') {
+        if (funds < PLATING.cost) return 0;
+        return PLATING.cost; // the caller tops the plating up
       }
-      const w = WEAPONS[id];
-      if (!w || money < w.price) return 0;
-      if (!state.owned[id]) {
-        state.owned[id] = true;
-        state.mag[id] = w.mag;
-        state.reserve[id] = w.reserve;
+      const w = ARSENAL[id];
+      if (!w || funds < w.cost) return 0;
+      if (!rack.held[id]) {
+        rack.held[id] = true;
+        rack.clip[id] = w.clip;
+        rack.spare[id] = w.spare;
       } else {
-        state.reserve[id] = Math.min(w.reserve, state.reserve[id] + w.mag);
+        rack.spare[id] = Math.min(w.spare, rack.spare[id] + w.clip);
       }
-      state.current = id;
-      return w.price;
+      rack.inHand = id;
+      return w.cost;
     },
-    select(id) {
-      if (!state.owned[id] || state.reloading) return false;
-      state.current = id;
+    swapTo(id) {
+      if (!rack.held[id] || rack.busy) return false;
+      rack.inHand = id;
       return true;
     },
-    ready() {
-      return state.cooldown <= 0 && !state.reloading && state.mag[state.current] > 0;
+    canFire() {
+      return rack.cool <= 0 && !rack.busy && rack.clip[rack.inHand] > 0;
     },
     // Spread in radians: base + movement + heat, halved while scoped.
-    spread(moveSpeed, crouched, scoped) {
-      const w = WEAPONS[state.current];
-      let s = w.spreadBase + state.heat * 0.02;
-      s += Math.min(1, moveSpeed / 5.4) * w.spreadMove;
-      if (crouched) s *= 0.7;
-      if (scoped && w.scoped) s *= 0.45;
+    cone(pace, ducked, zoomed) {
+      const w = ARSENAL[rack.inHand];
+      let s = w.spreadCalm + rack.heat * 0.02;
+      s += Math.min(1, pace / 5.4) * w.spreadStride;
+      if (ducked) s *= 0.7;
+      if (zoomed && w.hasScope) s *= 0.45;
       return s;
     },
-    fire() {
-      if (!this.ready()) return false;
-      const w = WEAPONS[state.current];
-      state.mag[state.current] -= 1;
-      state.cooldown = w.interval;
-      state.heat = Math.min(1, state.heat + (w.auto ? 0.09 : 0.16));
-      state.shotsFired += 1;
-      audio.shot(w.kind);
+    discharge() {
+      if (!this.canFire()) return false;
+      const w = ARSENAL[rack.inHand];
+      rack.clip[rack.inHand] -= 1;
+      rack.cool = w.gap;
+      rack.heat = Math.min(1, rack.heat + (w.fullAuto ? 0.09 : 0.16));
+      rack.roundsFired += 1;
+      sound.gunshot(w.family);
       return true;
     },
-    dryFire() {
-      audio.dryClick();
+    clickEmpty() {
+      sound.emptyClick();
     },
-    startReload() {
-      const w = WEAPONS[state.current];
-      if (state.reloading || state.mag[state.current] >= w.mag || state.reserve[state.current] <= 0) return false;
-      state.reloading = true;
-      state.reloadAt = RELOAD_TIME;
-      audio.reload();
+    beginReload() {
+      const w = ARSENAL[rack.inHand];
+      if (rack.busy || rack.clip[rack.inHand] >= w.clip || rack.spare[rack.inHand] <= 0) return false;
+      rack.busy = true;
+      rack.reloadLeft = RELOAD_SPAN;
+      sound.reloadClicks();
       return true;
     },
-    throwGrenade() {
-      if (state.grenades <= 0) return false;
-      state.grenades -= 1;
-      audio.grenade();
+    tossFrag() {
+      if (rack.frags <= 0) return false;
+      rack.frags -= 1;
+      sound.pinPull();
       return true;
     },
-    step(dt) {
-      state.cooldown = Math.max(0, state.cooldown - dt);
-      state.heat = Math.max(0, state.heat - dt * 0.9);
-      if (state.reloading) {
-        state.reloadAt -= dt;
-        if (state.reloadAt <= 0) {
-          const w = WEAPONS[state.current];
-          const need = w.mag - state.mag[state.current];
-          const take = Math.min(need, state.reserve[state.current]);
-          state.mag[state.current] += take;
-          state.reserve[state.current] -= take;
-          state.reloading = false;
+    tick(dt) {
+      rack.cool = Math.max(0, rack.cool - dt);
+      rack.heat = Math.max(0, rack.heat - dt * 0.9);
+      if (rack.busy) {
+        rack.reloadLeft -= dt;
+        if (rack.reloadLeft <= 0) {
+          const w = ARSENAL[rack.inHand];
+          const need = w.clip - rack.clip[rack.inHand];
+          const take = Math.min(need, rack.spare[rack.inHand]);
+          rack.clip[rack.inHand] += take;
+          rack.spare[rack.inHand] -= take;
+          rack.busy = false;
         }
       }
     },
-    resetForRound(keepGrenades) {
+    freshRound(keepFrags) {
       // A new round: keep owned guns, refill the current magazine only
-      // when the reserve allows; grenades do not carry over.
-      state.reloading = false;
-      state.cooldown = 0;
-      state.heat = 0;
-      if (!keepGrenades) state.grenades = 0;
+      // when the spare allows; grenades do not carry over.
+      rack.busy = false;
+      rack.cool = 0;
+      rack.heat = 0;
+      if (!keepFrags) rack.frags = 0;
     },
   };
 }
 
 // A thrown grenade: a point with velocity, gravity and a fuse. It bounces
 // once off the floor (loses half its speed) and explodes at fuse end,
-// damaging every body within radius with falloff. Pure data + step; the
+// damaging every body within radius with falloff. Pure data + tick; the
 // renderer (fx.js) draws the tracer from the same state.
-export function createGrenade(origin, direction, speed = 16) {
+export function lobFrag(origin, direction, speed = 16) {
   return {
-    position: { x: origin.x, y: origin.y, z: origin.z },
-    velocity: { x: direction.x * speed, y: direction.y * speed + 2.5, z: direction.z * speed },
-    fuse: GRENADE.fuse,
-    exploded: false,
+    spot: { x: origin.x, y: origin.y, z: origin.z },
+    speed: { x: direction.x * speed, y: direction.y * speed + 2.5, z: direction.z * speed },
+    fuse: FRAG.fuse,
+    blown: false,
     bounced: false,
-    step(dt) {
-      if (this.exploded) return;
+    tick(dt) {
+      if (this.blown) return;
       this.fuse -= dt;
-      this.velocity.y -= 14 * dt;
-      this.position.x += this.velocity.x * dt;
-      this.position.y += this.velocity.y * dt;
-      this.position.z += this.velocity.z * dt;
-      if (this.position.y <= 0.15 && !this.bounced) {
-        this.position.y = 0.15;
-        this.velocity.y = Math.abs(this.velocity.y) * 0.45;
-        this.velocity.x *= 0.6;
-        this.velocity.z *= 0.6;
+      this.speed.y -= 14 * dt;
+      this.spot.x += this.speed.x * dt;
+      this.spot.y += this.speed.y * dt;
+      this.spot.z += this.speed.z * dt;
+      if (this.spot.y <= 0.15 && !this.bounced) {
+        this.spot.y = 0.15;
+        this.speed.y = Math.abs(this.speed.y) * 0.45;
+        this.speed.x *= 0.6;
+        this.speed.z *= 0.6;
         this.bounced = true;
       }
-      if (this.fuse <= 0) this.exploded = true;
+      if (this.fuse <= 0) this.blown = true;
     },
   };
 }
