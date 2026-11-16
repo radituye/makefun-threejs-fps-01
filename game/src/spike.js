@@ -1,94 +1,94 @@
-// Spike: the round objective. One plain string field, `mode`, carries the
-// state — 'carried', 'planting', 'planted', 'defusing', 'detonated',
-// 'defused' — and the timers live beside it, so a check can never read
-// the state object as if it were the mode string. The carrier plants by
-// holding E inside a site, standing still; the plant takes 3.5 s, the
-// detonation timer runs 35 s, and a defender defuses in 5 s.
-export const PLANT_TIME = 3.5;
-export const DETONATE_TIME = 35;
-export const DEFUSE_TIME = 5;
+// Charge: the round objective. One plain string field, `stage`, carries
+// the state — 'held', 'rigging', 'set', 'disarming', 'blown', 'cleared' —
+// and the timers live beside it, so a check can never read the state
+// object as if it were the stage string. The carrier rigs it by holding
+// E inside a yard, standing still; the rig takes 3.5 s, the detonation
+// timer runs 35 s, and a guard disarms it in 5 s.
+export const PLANT_SPAN = 3.5;
+export const FUSE_SPAN = 35;
+export const DEFUSE_SPAN = 5;
 
-export function createSpike(audio) {
-  const state = {
-    mode: 'carried', // carried | planting | planted | defusing | detonated | defused
-    site: null, // 'A' | 'B' once planted
-    position: null, // {x, y, z} once planted
-    plantProgress: 0,
-    defuseProgress: 0,
-    timer: 0, // counts down while planted
-    carrierAlive: true,
+export function rigCharge(sound) {
+  const charge = {
+    stage: 'held', // held | rigging | set | disarming | blown | cleared
+    yard: null, // 'A' | 'B' once set
+    spot: null, // {x, y, z} once set
+    plantMade: 0,
+    defuseMade: 0,
+    fuseLeft: 0, // counts down while set
+    carrierUp: true,
   };
 
   return {
-    state,
-    reset() {
-      state.mode = 'carried';
-      state.site = null;
-      state.position = null;
-      state.plantProgress = 0;
-      state.defuseProgress = 0;
-      state.timer = 0;
-      state.carrierAlive = true;
+    state: charge,
+    clear() {
+      charge.stage = 'held';
+      charge.yard = null;
+      charge.spot = null;
+      charge.plantMade = 0;
+      charge.defuseMade = 0;
+      charge.fuseLeft = 0;
+      charge.carrierUp = true;
     },
-    // The carrier holds E inside a site, standing still. Returns true
-    // while the plant channel is running.
-    plantStep(dt, inSite, still, siteId, position) {
-      if (state.mode !== 'carried' && state.mode !== 'planting') return false;
-      if (!inSite || !still) {
-        state.mode = 'carried';
-        state.plantProgress = 0;
+    // The carrier holds E inside a yard, standing still. Returns true
+    // while the rig channel is running.
+    plantTick(dt, inYard, still, yardId, spot) {
+      if (charge.stage !== 'held' && charge.stage !== 'rigging') return false;
+      if (!inYard || !still) {
+        charge.stage = 'held';
+        charge.plantMade = 0;
         return false;
       }
-      state.mode = 'planting';
-      state.plantProgress += dt;
-      if (Math.floor(state.plantProgress * 4) !== Math.floor((state.plantProgress - dt) * 4)) {
-        audio.beep(false);
+      charge.stage = 'rigging';
+      charge.plantMade += dt;
+      if (Math.floor(charge.plantMade * 4) !== Math.floor((charge.plantMade - dt) * 4)) {
+        sound.chirp(false);
       }
-      if (state.plantProgress >= PLANT_TIME) {
-        state.mode = 'planted';
-        state.site = siteId;
-        state.position = { x: position.x, y: position.y, z: position.z };
-        state.timer = DETONATE_TIME;
-        state.plantProgress = 0;
-        audio.plantDone();
+      if (charge.plantMade >= PLANT_SPAN) {
+        charge.stage = 'set';
+        charge.yard = yardId;
+        charge.spot = { x: spot.x, y: spot.y, z: spot.z };
+        charge.fuseLeft = FUSE_SPAN;
+        charge.plantMade = 0;
+        sound.plantChime();
         return true;
       }
       return false;
     },
-    // A defender holds E beside the planted spike. Returns true on defuse.
-    defuseStep(dt, near, still) {
-      if (state.mode !== 'planted' && state.mode !== 'defusing') return false;
+    // A guard holds E beside the set charge. Returns true on disarm.
+    defuseTick(dt, near, still) {
+      if (charge.stage !== 'set' && charge.stage !== 'disarming') return false;
       if (!near || !still) {
-        if (state.mode === 'defusing') state.mode = 'planted';
-        state.defuseProgress = 0;
+        if (charge.stage === 'disarming') charge.stage = 'set';
+        charge.defuseMade = 0;
         return false;
       }
-      state.mode = 'defusing';
-      state.defuseProgress += dt;
-      if (Math.floor(state.defuseProgress * 2) !== Math.floor((state.defuseProgress - dt) * 2)) {
-        audio.beep(false);
+      charge.stage = 'disarming';
+      charge.defuseMade += dt;
+      if (Math.floor(charge.defuseMade * 2) !== Math.floor((charge.defuseMade - dt) * 2)) {
+        sound.chirp(false);
       }
-      if (state.defuseProgress >= DEFUSE_TIME) {
-        state.mode = 'defused';
-        state.defuseProgress = 0;
+      if (charge.defuseMade >= DEFUSE_SPAN) {
+        charge.stage = 'cleared';
+        charge.defuseMade = 0;
         return true;
       }
       return false;
     },
-    step(dt) {
-      if (state.mode === 'planted' || state.mode === 'defusing') {
-        state.timer -= dt;
-        if (state.timer <= 0) {
-          state.mode = 'detonated';
-          state.timer = 0;
-          audio.explosion();
-          return 'detonated';
+    tick(dt) {
+      if (charge.stage === 'set' || charge.stage === 'disarming') {
+        charge.fuseLeft -= dt;
+        if (charge.fuseLeft <= 0) {
+          charge.stage = 'blown';
+          charge.fuseLeft = 0;
+          sound.blast();
+          return 'blown';
         }
       }
       return null;
     },
-    isPlanted() {
-      return state.mode === 'planted' || state.mode === 'defusing';
+    isSet() {
+      return charge.stage === 'set' || charge.stage === 'disarming';
     },
   };
 }
